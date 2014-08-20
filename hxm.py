@@ -25,8 +25,43 @@ while True:
 	if type != rate:
 		print >>sys.stderr, "Unknown message type"
 	dlc = ser.read()	# DLC
-	if dlc != dlc_byte:
+	len, = struct.unpack("<B", dlc)
+	if len != 55:
 		print >>sys.stderr, "Bad DLC"
+	payload = ser.read(len)
+	crc, = struct.unpack("<B", ser.read())
+	end, = struct.unpack("<B", ser.read())
+	sum = 0
+	print "L: " + str(len)
+	for i in xrange(len):
+		b, = struct.unpack("<B", payload[i])
+		#print "Data: 0x%02x" % b
+		sum = (sum ^ b) & 0xff
+		for j in xrange(8):
+			if sum & 0x01:
+				sum = (sum >> 1) ^ 0x8c
+			else:
+				sum = (sum >> 1)
+	#print "CRC:  0x%02x" % crc
+	if crc != sum:
+		print >>sys.stderr, "Bad CRC: " + str(sum) + " is not " + str(crc)
+	else:
+		print "CRC validated!"
+	if end != 0x03:
+		print >>sys.stderr, "Bad ETX"
+	fid, fiv, hid, hiv, batt, hr, hbn, hbts1, hbts2, hbts3, hbts4, hbts5, hbts6, hbts7, hbts8, hbts9, hbts10, hbts11, hbts12, hbts13, hbts14, hbts15, distance, speed, strides = struct.unpack("<H2sH2sBBB15H6xHHB3x", payload)
+	print "Firmware: 9500.%04d.V%2s" % (fid, fiv)
+	print "Hardware: 9800.%04d.V%2s" % (hid, hiv)
+	print "Battery: %3d%%" % batt
+	print "Heart Rate: %3d bpm" % hr
+	print "Heart Beat Number: %d" % hbn
+	print "Heart Beat Timestamp #1 (Newest): %d ms" % hbts1
+	#for i in xrange(14):
+	#	print "Heart Beat Timestamp #%d: %d ms" % (i+2, byte)
+	print "Distance: %.3f m" % (float(distance)/16)
+	print "Instantaneous Speed: %.3f m/s" % (float(speed)/256)
+	print "Strides: %d" % strides
+	continue
 	data = ser.read(2)	# Firmware ID
 	fid, = struct.unpack("<H", data)
 	#print "Firmware ID: 0x%02x" % fid
